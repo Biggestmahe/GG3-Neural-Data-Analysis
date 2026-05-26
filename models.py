@@ -121,7 +121,7 @@ class StepModel():
             spikes.append(self.emit(rate))
 
         if get_rate:
-            return np.array(spikes), np.array(jumps), np.array(rates)
+            return np.array(spikes), np.array(jumps), np.array(rates) 
         else:
             return np.array(spikes), np.array(jumps)
 
