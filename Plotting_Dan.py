@@ -94,6 +94,7 @@ def histogram_step_times(Step_Times, binsize=10):
     plt.ylabel('Density')
     plt.show()
 
+
 def histogram_Rh_times(rates, binsize=10):
     # plot histogram of times when rates reach Rh across trials
 
@@ -196,25 +197,7 @@ def fano_factor(spikes, T = 1000, binsize=10, multifano=False, spikes2=None, spi
 
     plt.show()
 
-
-#def grad_based_classifier(spikes, T = 1000, binsize=50, Ntrials=400, smoothing = 0.5):
-
-#    all_spike_times = []
-#    for trial in range(Ntrials):
-#        trial_spikes = np.where(spikes[trial] > 0)[0]
-#        all_spike_times.extend(trial_spikes)
-
-
-#    plt.figure(figsize=(10, 4))
-
-#    sns.histplot(all_spike_times, bins=np.arange(0, max(all_spike_times) + binsize, binsize), 
-#                stat="density", kde=True, kde_kws={'bw_adjust': smoothing})
-
-#    plt.title('Spike Time Distribution with KDE')
-#    plt.xlabel('Time (ms)')
-#    plt.ylabel('Density')
-#    plt.show()
-
+### Grad based classifier not used ####
 
 def grad_based_classifier(spikes, T=1000, binsize=50, Ntrials=400, smoothing=0.5):
 
@@ -225,39 +208,31 @@ def grad_based_classifier(spikes, T=1000, binsize=50, Ntrials=400, smoothing=0.5
 
     plt.figure(figsize=(10, 4))
 
-    # 1. Assign the plot to 'ax' so we can extract the line data
     ax = sns.histplot(all_spike_times, bins=np.arange(0, max(all_spike_times) + binsize, binsize), 
                       stat="density", kde=True, kde_kws={'bw_adjust': smoothing})
 
-    # 2. Extract the smooth KDE curve data
     if len(ax.lines) > 0:
         kde_line = ax.lines[0]
         x_line = kde_line.get_xdata()  # Time points
         y_line = kde_line.get_ydata()  # Firing rate density
 
-        # 3. Calculate the gradient along the curve (dy/dx)
         gradients = np.gradient(y_line, x_line)
 
-        # 4. Define your evaluation range (T/4 to 3T/4)
         start_time = T / 4
         end_time = (3 * T) / 4
 
-        # Isolate indices within that range
         in_range_indices = np.where((x_line >= start_time) & (x_line <= end_time))[0]
 
         if len(in_range_indices) > 0:
             gradients_in_range = gradients[in_range_indices]
             x_in_range = x_line[in_range_indices]
 
-            # 5. Pull out the maximum gradient and its corresponding time
             max_grad = np.max(gradients_in_range)
             max_grad_idx = np.argmax(gradients_in_range)
             time_of_max_grad = x_in_range[max_grad_idx]
             
-            # Find corresponding y-value on the curve for plotting
             y_of_max_grad = y_line[in_range_indices[max_grad_idx]]
 
-            # 6. Plot a red dot at the point of maximum slope for visual confirmation
             plt.scatter(time_of_max_grad, y_of_max_grad, color='red', s=100, zorder=5, 
                         label=f'Max Slope: {max_grad:.6f} at {time_of_max_grad:.1f}ms')
             plt.legend()
@@ -285,9 +260,8 @@ def grad_based_classifier(spikes, T=1000, binsize=50, Ntrials=400, smoothing=0.5
     return max_grad
 
 
-
-
 def analyze_fano_dft(spikes, T=1000, binsize=10, label="Model Data"):
+
 
     #calculates dft of fano factor graphs looking for low freq wave
 
@@ -357,4 +331,296 @@ def analyze_fano_dft(spikes, T=1000, binsize=10, label="Model Data"):
     if power_at_1hz > 5.5:
         print(f"Step Model")
     else:
+
         print(f"Drift Diffusion Model")
+
+
+def compare_HMM_to_real(rates_continuous, rates_hmm, dt, no_of_plotted_trials=3):
+    """Plots and compares firing rate trajectories between the continuous ramp
+
+    model and the discrete HMM approximation.
+
+    Parameters:
+    -----------
+    rates_continuous : np.ndarray
+        Shape (Ntrials, Nsteps) containing rates from the continuous model.
+    rates_hmm : np.ndarray
+        Shape (Ntrials, Nsteps) containing rates from the discrete HMM simulation.
+    dt : float
+        Time step size in seconds (e.g., 0.001 for 1ms steps).
+    no_of_plotted_trials : int
+        Number of individual trial trajectories to overlay.
+    """
+    n_trials, n_steps = rates_continuous.shape
+    time_axis = np.arange(n_steps) * (dt * 1000)  # Convert to ms for plotting
+
+    plt.figure(figsize=(14, 10))
+
+    # --- SUBPLOT 1: Individual Continuous Model Trials ---
+    plt.subplot(2, 2, 1)
+    for i in range(min(no_of_plotted_trials, n_trials)):
+        plt.plot(time_axis, rates_continuous[i], alpha=0.8, label=f"Trial {i}")
+    plt.title("Continuous Ramp Model: Individual Trials")
+    plt.xlabel("Time (ms)")
+    plt.ylabel("Firing Rate (Hz)")
+    plt.grid(True, alpha=0.3)
+    plt.legend()
+
+    # --- SUBPLOT 2: Individual Discrete HMM Trials ---
+    plt.subplot(2, 2, 2)
+    for i in range(min(no_of_plotted_trials, n_trials)):
+        plt.plot(
+            time_axis,
+            rates_hmm[i],
+            alpha=0.8,
+            linestyle="-",
+            label=f"HMM Trial {i}",
+        )
+    plt.title(f"Discrete HMM (K={rates_hmm.shape[0]}) Trials")
+    plt.xlabel("Time (ms)")
+    plt.ylabel("Firing Rate (Hz)")
+    plt.grid(True, alpha=0.3)
+    plt.legend()
+
+    # --- SUBPLOT 3: Single Trial Direct Overlay Comparison ---
+    plt.subplot(2, 2, 3)
+    plt.plot(
+        time_axis,
+        rates_continuous[0],
+        color="C0",
+        linewidth=2,
+        label="Continuous (Trial 0)",
+    )
+    plt.plot(
+        time_axis,
+        rates_hmm[0],
+        color="C1",
+        linewidth=2,
+        linestyle="--",
+        label="HMM (Trial 0)",
+    )
+    plt.title("Direct Path Overlay (Trial 0)")
+    plt.xlabel("Time (ms)")
+    plt.ylabel("Firing Rate (Hz)")
+    plt.grid(True, alpha=0.3)
+    plt.legend()
+
+    # --- SUBPLOT 4: Grand Trial Average (The Ultimate Sanity Check) ---
+    mean_continuous = np.mean(rates_continuous, axis=0)
+    mean_hmm = np.mean(rates_hmm, axis=0)
+
+    plt.subplot(2, 2, 4)
+    plt.plot(
+        time_axis,
+        mean_continuous,
+        color="navy",
+        linewidth=2.5,
+        label="Continuous Grand Mean",
+    )
+    plt.plot(
+        time_axis,
+        mean_hmm,
+        color="darkorange",
+        linewidth=2.5,
+        linestyle="--",
+        label="HMM Grand Mean",
+    )
+    plt.title(f"Grand Average Across {n_trials} Trials")
+    plt.xlabel("Time (ms)")
+    plt.ylabel("Firing Rate (Hz)")
+    plt.grid(True, alpha=0.3)
+    plt.legend()
+
+    plt.tight_layout()
+    plt.show()
+
+
+def plot_step_model_comparison(
+    continuous_rates, HMM_rates, continuous_jumps, HMM_jumps, dt=0.001, num_plotted_trials = 5
+):
+
+    # calculate time array in milliseconds
+    T = continuous_rates.shape[1]
+    time_ms = np.arange(T) * (dt * 1000)
+    num_trials = continuous_rates.shape[0]
+
+    # calculate grand means across all simulated trials
+    mean_continuous_rate = np.mean(continuous_rates, axis=0)
+    mean_HMM_rate = np.mean(HMM_rates, axis=0)
+
+    # convert raw step jump indices to milliseconds
+    continuous_jumps_ms = continuous_jumps * (dt * 1000)
+    HMM_jumps_ms = HMM_jumps * (dt * 1000)
+
+    # initialize a 2x2 square grid layout
+    fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+
+    # --- row 0, col 0: continuous individual trials ---
+    for trial in range(num_plotted_trials):
+        axes[0, 0].plot(time_ms, continuous_rates[trial, :], color="navy", alpha=1, linewidth=1)
+    axes[0, 0].set_title(f"Continuous Trials ({num_trials})", fontsize=12)
+    axes[0, 0].set_xlabel("Time (ms)", fontsize=11)
+    axes[0, 0].set_ylabel("Firing Rate (Hz)", fontsize=11)
+    axes[0, 0].grid(alpha=0.3)
+    axes[0, 0].set_ylim(-5, 55)
+
+    # --- row 0, col 1: hmm individual trials ---
+    for trial in range(num_plotted_trials):
+        axes[0, 1].plot(time_ms, HMM_rates[trial, :], color="darkorange", alpha=1, linewidth=1)
+    axes[0, 1].set_title(f"HMM Trials ({num_trials})", fontsize=12)
+    axes[0, 1].set_xlabel("Time (ms)", fontsize=11)
+    axes[0, 1].set_ylabel("Firing Rate (Hz)", fontsize=11)
+    axes[0, 1].grid(alpha=0.3)
+    axes[0, 1].set_ylim(-5, 55)
+
+    # --- row 1, col 0: grand mean comparison ---
+    axes[1, 0].plot(
+        time_ms,
+        mean_continuous_rate,
+        label="Continuous Mean",
+        color="navy",
+        linewidth=2.5,
+    )
+    axes[1, 0].plot(
+        time_ms,
+        mean_HMM_rate,
+        label="HMM Mean",
+        color="darkorange",
+        linestyle="--",
+        linewidth=2.5,
+    )
+    axes[1, 0].set_title("Grand Mean Comparison", fontsize=12)
+    axes[1, 0].set_xlabel("Time (ms)", fontsize=11)
+    axes[1, 0].set_ylabel("Firing Rate (Hz)", fontsize=11)
+    axes[1, 0].legend(loc="lower right")
+    axes[1, 0].grid(alpha=0.3)
+    axes[1, 0].set_ylim(-5, 55)
+
+    # --- row 1, col 1: jump time histograms ---
+    min_time = min(np.min(continuous_jumps_ms), np.min(HMM_jumps_ms))
+    max_time = max(np.max(continuous_jumps_ms), np.max(HMM_jumps_ms))
+    bins = np.linspace(min_time, max_time, 20)
+
+    axes[1, 1].hist(
+        continuous_jumps_ms,
+        bins=bins,
+        alpha=0.5,
+        label="Continuous",
+        color="navy",
+        edgecolor="black",
+    )
+    axes[1, 1].hist(
+        HMM_jumps_ms,
+        bins=bins,
+        alpha=0.5,
+        label="HMM",
+        color="darkorange",
+        edgecolor="black",
+    )
+    axes[1, 1].set_title("Distribution of Jump Times", fontsize=12)
+    axes[1, 1].set_xlabel("Jump Time (ms)", fontsize=11)
+    axes[1, 1].set_ylabel("Trial Count", fontsize=11)
+    axes[1, 1].legend(loc="upper right")
+    axes[1, 1].grid(alpha=0.3)
+
+    plt.tight_layout()
+    plt.show()
+
+
+
+
+def plot_multistate_model_comparison(
+    continuous_rates, HMM_multi_rates, continuous_jumps, HMM_multi_jumps, dt=0.001, num_plotted_trials = 5
+):
+
+    # calculate time array in milliseconds
+    T = continuous_rates.shape[1]
+    time_ms = np.arange(T) * (dt * 1000)
+    num_trials = continuous_rates.shape[0]
+
+    # calculate grand means across all simulated trials
+    mean_continuous_rate = np.mean(continuous_rates, axis=0)
+    mean_HMM_multi_rate = np.mean(HMM_multi_rates, axis=0)
+
+    # convert raw step jump indices to milliseconds
+    continuous_jumps_ms = continuous_jumps * (dt * 1000)
+    HMM_multi_jumps_ms = HMM_multi_jumps * (dt * 1000)
+
+    # initialize a 2x2 square grid layout
+    fig, axes = plt.subplots(2, 2, figsize=(14, 10))
+
+    # --- row 0, col 0: continuous individual trials ---
+    for trial in range(num_plotted_trials):
+        axes[0, 0].plot(time_ms, continuous_rates[trial, :], color="navy", alpha=1, linewidth=1)
+    axes[0, 0].set_title(f"Continuous Model Trials ({num_trials})", fontsize=12)
+    axes[0, 0].set_xlabel("Time (ms)", fontsize=11)
+    axes[0, 0].set_ylabel("Firing Rate (Hz)", fontsize=11)
+    axes[0, 0].grid(alpha=0.3)
+    axes[0, 0].set_ylim(-5, 55)
+
+    # --- row 0, col 1: multi-state hmm individual trials ---
+    for trial in range(num_plotted_trials):
+        axes[0, 1].plot(time_ms, HMM_multi_rates[trial, :], color="forestgreen", alpha=1, linewidth=1)
+    axes[0, 1].set_title(f"Multi-state HMM Trials ({num_trials})", fontsize=12)
+    axes[0, 1].set_xlabel("Time (ms)", fontsize=11)
+    axes[0, 1].set_ylabel("Firing Rate (Hz)", fontsize=11)
+    axes[0, 1].grid(alpha=0.3)
+    axes[0, 1].set_ylim(-5, 55)
+
+    # --- row 1, col 0: grand mean comparison ---
+    axes[1, 0].plot(
+        time_ms,
+        mean_continuous_rate,
+        label="Continuous Mean",
+        color="navy",
+        linewidth=2.5,
+    )
+    axes[1, 0].plot(
+        time_ms,
+        mean_HMM_multi_rate,
+        label="Multi-state HMM Mean",
+        color="forestgreen",
+        linestyle="--",
+        linewidth=2.5,
+    )
+    axes[1, 0].set_title("Grand Mean Comparison", fontsize=12)
+    axes[1, 0].set_xlabel("Time (ms)", fontsize=11)
+    axes[1, 0].set_ylabel("Firing Rate (Hz)", fontsize=11)
+    axes[1, 0].legend(loc="lower right")
+    axes[1, 0].grid(alpha=0.3)
+    axes[1, 0].set_ylim(-5, 55)
+
+    # --- row 1, col 1: jump time histograms ---
+    min_time = min(np.min(continuous_jumps_ms), np.min(HMM_multi_jumps_ms))
+    max_time = max(np.max(continuous_jumps_ms), np.max(HMM_multi_jumps_ms))
+    bins = np.linspace(min_time, max_time, 20)
+
+    axes[1, 1].hist(
+        continuous_jumps_ms,
+        bins=bins,
+        alpha=0.5,
+        label="Continuous",
+        color="navy",
+        edgecolor="black",
+    )
+    axes[1, 1].hist(
+        HMM_multi_jumps_ms,
+        bins=bins,
+        alpha=0.5,
+        label="Multi-state HMM",
+        color="forestgreen",
+        edgecolor="black",
+    )
+    axes[1, 1].set_title("Distribution of Jump Times", fontsize=12)
+    axes[1, 1].set_xlabel("Jump Time (ms)", fontsize=11)
+    axes[1, 1].set_ylabel("Trial Count", fontsize=11)
+    axes[1, 1].legend(loc="upper right")
+    axes[1, 1].grid(alpha=0.3)
+
+    plt.tight_layout()
+    plt.show()
+
+
+
+
+###
